@@ -4,13 +4,12 @@ import math
 import pdb
 from math import acos, atan2, cos, pi, sin, sqrt
 
-import geometry_msgs.msg
 import numpy as np
 import quaternion
 import rospy
 # from driver import matrix_util
 from gazebo_msgs.msg import ModelStates
-from geometry_msgs.msg import Quaternion
+from geometry_msgs.msg import Quaternion, Twist
 from std_msgs.msg import Float64, Bool
 import time
 
@@ -91,6 +90,8 @@ fusedAngles['roll'] = 0
 global isFallen 
 isFallen = False
 
+global cmd_vel
+cmd_vel = Twist()
 
 # this gets caled each time the state data is updated.
 def control_loop(data): 
@@ -123,6 +124,15 @@ def cmd_teeterbot(lcmd, rcmd):
     pub_r.publish(rcmd)
     # pdb.set_trace()
 
+def cmd_vel_callback(twist: Twist):
+    # print('cmd_vel_callback')
+    cmd_vel.linear.x = twist.linear.x
+    cmd_vel.linear.y = twist.linear.y
+    cmd_vel.linear.z = twist.linear.z
+    cmd_vel.angular.x = twist.angular.x
+    cmd_vel.angular.y = twist.angular.y
+    cmd_vel.angular.y = twist.angular.z
+    # pdb.set_trace(header='CALLBACK')
 
 if __name__ == '__main__':
     try:
@@ -134,14 +144,17 @@ if __name__ == '__main__':
         cmd_teeterbot(0, 0)
         rospy.Subscriber('gazebo/model_states', ModelStates, control_loop)
         rospy.Subscriber('teeterbot/fallen_over', Bool, fallen_over_callback)
+        rospy.Subscriber('cmd_vel', Twist, cmd_vel_callback)
         # rospy.spin()
 
         dt = 0.01
-        rate = rospy.Rate(1/dt) # 10hz 
+        rate = rospy.Rate(1/dt)
         # pdb.set_trace(header='CALLBACK')
         last_pitch = 0
         dpitchdt = 0
         kp = 90; kd = 10
+        LIN_VEL_SCALING = 10
+        ANG_VEL_SCALING = 0.1
         while not rospy.is_shutdown():
             if isFallen:
                 cmd_teeterbot(0, 0)
@@ -153,15 +166,15 @@ if __name__ == '__main__':
 
                 # control loop here
                 cmd = kp*fusedAngles['pitch'] + kd*dpitchdt
-                rospy.loginfo("fusedYaw={: 6.4f}, fusedPitch={: 6.4f}, fusedRoll={: 6.4f}, pitchVel={: 6.4f}".format(
-                    fusedAngles['yaw'], fusedAngles['pitch'], fusedAngles['roll'], dpitchdt))
-                
-                
-
+                # rospy.loginfo("fusedYaw={: 6.4f}, fusedPitch={: 6.4f}, fusedRoll={: 6.4f}, pitchVel={: 6.4f}".format(
+                #     fusedAngles['yaw'], fusedAngles['pitch'], fusedAngles['roll'], dpitchdt))
+                cmd += LIN_VEL_SCALING*cmd_vel.linear.x
+                rot_cmd = ANG_VEL_SCALING*cmd_vel.angular.y
 
                 # rospy.loginfo(cmd)
-                cmd_teeterbot(cmd, cmd)
-                # pdb.set_trace(header='CALLBACK')
+                # print(cmd_vel)
+                cmd_teeterbot(cmd - rot_cmd, cmd + rot_cmd)
+                
 
             rate.sleep()
     except rospy.ROSInterruptException:
