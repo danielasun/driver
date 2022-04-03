@@ -13,6 +13,8 @@ from geometry_msgs.msg import Quaternion, Twist
 from std_msgs.msg import Float64, Bool
 import time
 
+from driver.util import print_teeterbot
+
 
 def fused_yaw_of_rot_matrix(R):
     """
@@ -175,6 +177,7 @@ if __name__ == '__main__':
                 # print(cmd_vel)
                 cmd_teeterbot(cmd - rot_cmd, cmd + rot_cmd)
                 
+                print_teeterbot("Teeterbot")
 
             rate.sleep()
     except rospy.ROSInterruptException:
