@@ -44,15 +44,25 @@ def driver():
     pub_r = rospy.Publisher('teeterbot/right_torque_cmd', Float64, queue_size=10)
     rospy.init_node('driver', anonymous=True)
     rate = rospy.Rate(10) # 10hz
-    while not rospy.is_shutdown():
-        cmd = 5.0
+    try:
+        while not rospy.is_shutdown():
+            cmd = 0
+            rospy.loginfo(cmd)
+            pub_l.publish(-cmd)
+            pub_r.publish(cmd)
+            rate.sleep()
+    except Exception as e:
+        # set both commands to zero if the node is killed
+        cmd = 0 
         rospy.loginfo(cmd)
         pub_l.publish(-cmd)
         pub_r.publish(cmd)
-        rate.sleep()
+        raise e
 
 if __name__ == '__main__':
     try:
         driver()
     except rospy.ROSInterruptException:
         pass
+
+        
