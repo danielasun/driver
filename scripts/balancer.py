@@ -163,25 +163,28 @@ if __name__ == '__main__':
                 v_world = model_states.twist[1].linear
                 v_world = np.array([v_world.x, v_world.y])
                 v_body = mu.r2(fused_angles['yaw']).T@v_world # x component of this is the forwards velocity.
+                # pdb.set_trace(header='CALLBACK')
                 # print(v_body)
 
                 ##################
                 ## control loop ##
                 ##################
 
-                # pitch regulation #
-                cmd = KP_ANGLE*fused_angles['pitch'] + KD_ANGLE*dpitchdt
+                # velocity regulation through pitch control #
+                velocity_error = cmd_vel.linear.x
+                velocity_error = cmd_vel.linear.x - v_body[0]
+                desired_pitch = 0.000*(velocity_error)
+                desired_pitch_vel = 0
+
+                # pitch regulation through torque control#
+                cmd = KP_ANGLE*(fused_angles['pitch']) + KD_ANGLE*(dpitchdt)
                 # rospy.loginfo("fusedYaw={: 6.4f}, fusedPitch={: 6.4f}, fusedRoll={: 6.4f}, pitchVel={: 6.4f}".format(
                 #     fused_angles['yaw'], fused_angles['pitch'], fused_angles['roll'], dpitchdt))
                 
-                # angle regulation #
+                # angle regulation through torque control#
                 rot_cmd = ANG_VEL_SCALING*cmd_vel.angular.y
 
 
-                # velocity regulation #
-                velocity_error = cmd_vel.linear.x - v_body[0]
-                velocity_error = cmd_vel.linear.x
-                cmd += LIN_VEL_SCALING*(velocity_error)
                 # cmd = cmd + K_VEL*(velocity_error)
 
                 # rospy.loginfo(cmd)
@@ -193,8 +196,6 @@ if __name__ == '__main__':
                 
                 cmd_l = np.clip(cmd - rot_cmd + l_friction, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
                 cmd_r = np.clip(cmd + rot_cmd + r_friction, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
-                # cmd_l = np.clip(cmd - rot_cmd, -10, 10)
-                # cmd_r = np.clip(cmd + rot_cmd, -10, 10)
                 cmd_teeterbot(cmd_l, cmd_r)
                 
                 # print_teeterbot("Teeterbot")
