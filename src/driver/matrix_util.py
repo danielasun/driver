@@ -62,3 +62,15 @@ def wrap(a, b=2*pi):
 
     # if a is larger than b/2, subtract b from a.
     return a+b*np.floor((b/2-a)/(b))
+
+
+def r2(a=None):
+    """
+    2x2 rotation matrix
+    :param a: angle in radians
+    :return: 2x2 rotation matrix
+    """
+
+    s = np.sin(a)
+    c = np.cos(a)
+    return np.array([[c, -s], [s, c]])
