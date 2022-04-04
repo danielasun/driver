@@ -2,25 +2,19 @@
 
 import math
 import pdb
+import time
 
-
+import driver.matrix_util as mu
 import numpy as np
 import quaternion
 import rospy
-# from driver import matrix_util
-from gazebo_msgs.msg import ModelStates, ModelState
-from geometry_msgs.msg import Quaternion, Twist
-from std_msgs.msg import Float64, Bool
-import time
-import driver.matrix_util as mu
-
-from driver.util import print_teeterbot
 from driver.controller import PIDController
+from driver.util import print_teeterbot
 
+from gazebo_msgs.msg import ModelState, ModelStates
+from geometry_msgs.msg import Quaternion, Twist
+from std_msgs.msg import Bool, Float64
 from std_srvs.srv import Empty
-
-
-
 
 
 class FallenOver(Exception):
@@ -114,12 +108,6 @@ def l_wheel_setter(vel):
 def r_wheel_setter(vel):
     global r_wheel_vel
     r_wheel_vel = vel.data
-    # print(vel, r_wheel_vel)
-
-
-# processing
-
-
 
 if __name__ == '__main__':
     try:
@@ -128,12 +116,15 @@ if __name__ == '__main__':
         reset_world = rospy.ServiceProxy('/gazebo/reset_world', Empty)
         reset_world()
 
+        # initialize publishers
         rospy.init_node('balancer', anonymous=True)
         pub_l = rospy.Publisher('teeterbot/left_torque_cmd', Float64, queue_size=1)
         pub_r = rospy.Publisher('teeterbot/right_torque_cmd', Float64, queue_size=1)
         
         # publish a zero command first 
         cmd_teeterbot(0, 0)
+
+        # subscribe to all necessary topics
         rospy.Subscriber('gazebo/model_states', ModelStates, model_state_update)
         rospy.Subscriber('teeterbot/fallen_over', Bool, fallen_over_callback)
         rospy.Subscriber('cmd_vel', Twist, cmd_vel_callback)
@@ -168,8 +159,6 @@ if __name__ == '__main__':
                 v_body = R_world_to_body@v_world # x component of this is the forwards velocity.
                 w_body = R_world_to_body@w_world # y component of this is the rate of change of the pitch
 
-                # pdb.set_trace(header='CALLBACK')
-
                 ##################
                 ## control loop ##
                 ##################
@@ -192,7 +181,8 @@ if __name__ == '__main__':
                 # angle regulation through torque control 
                 ang_vel_error = cmd_vel.angular.y - model_states.twist[1].angular.z
                 rot_cmd = KP_ANG_VEL*(ang_vel_error)
-                
+
+                # command torques to teeterbot motors
                 torque_cmd_l = np.clip(cmd - rot_cmd, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
                 torque_cmd_r = np.clip(cmd + rot_cmd, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
                 cmd_teeterbot(torque_cmd_l, torque_cmd_r)
@@ -204,7 +194,6 @@ if __name__ == '__main__':
                 print("desired_pitch:{: 6.3f} torque_cmd_l:{: 6.3f} torque_cmd_r:{: 6.3f}".format(
                     pitch_des, torque_cmd_l, torque_cmd_r))
             rate.sleep()
-        
     except rospy.ROSInterruptException:
         pass
     finally:
