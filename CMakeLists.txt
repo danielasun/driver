@@ -9,6 +9,7 @@ project(driver)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   rospy
+  teleop_twist_keyboard
 )
 
 ## System dependencies are found with CMake's conventions
