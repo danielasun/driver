@@ -141,24 +141,16 @@ if __name__ == '__main__':
         rospy.Subscriber('teeterbot/right_wheel_speed', Float64, r_wheel_setter)
         # rospy.spin()
 
-        dt = 0.01
+        dt = 0.01 # assuming that real time factor is 1.00
         rate = rospy.Rate(1/dt)
         # pdb.set_trace(header='CALLBACK')
         last_pitch = 0
         dpitchdt = 0
-        KP_PITCH = 0.05
-        KP_ANGLE = -90
-        KD_ANGLE = 10
-        K_VEL = 0 #100
-        LIN_VEL_SCALING = 10
-        ANG_VEL_SCALING = 0.1
-        WHEEL_DAMPING = 0
+        KP_VELOCITY = 0.2
+        KP_PITCH_ANGLE = -90
+        KD_PITCH_ANGLE = 10
+        KP_ANG_VEL = 0.1
         TEETERBOT_TORQUE_CTRL_MAX = 10
-
-        # velocity_ctrlr = PIDController(Kp=1, Kd=0, Ki=0, dt=dt, Emin=0, Emax=0, m=1)
-        # pitch_ctrlr = PIDController(Kp=[-90, -10], Kd=[0, 0], Ki=[0, 0], dt=dt, 
-        # Emin=[0, 0], Emax=[0, 0], m=2)
-
 
         while not rospy.is_shutdown():
             if isFallen:
@@ -173,31 +165,40 @@ if __name__ == '__main__':
                 v_world = np.array([v_world.x, v_world.y])
                 v_body = mu.r2(fused_angles['yaw']).T@v_world # x component of this is the forwards velocity.
                 # pdb.set_trace(header='CALLBACK')
-                # print(v_body)
 
                 ##################
                 ## control loop ##
                 ##################
 
+                """
+                Cascaded control loop:
+                velocity -> desired pitch
+                pitch -> desired torque
+                angular velocity -> difference in desired torque
+                """
+
                 # velocity regulation through pitch control #
                 velocity_error = cmd_vel.linear.x - v_body[0]
-                pitch_des = KP_PITCH*(velocity_error)
+                pitch_des = KP_VELOCITY*(velocity_error)
 
                 # pitch regulation through torque control#
                 pitch_error = pitch_des - fused_angles['pitch']
-                cmd = KP_ANGLE*(pitch_error) + KD_ANGLE*(dpitchdt)
+                cmd = KP_PITCH_ANGLE*(pitch_error) + KD_PITCH_ANGLE*(dpitchdt)
                 
                 # angle regulation through torque control#
                 ang_vel_error = cmd_vel.angular.y - model_states.twist[1].angular.z
-                rot_cmd = ANG_VEL_SCALING*(ang_vel_error)
+                rot_cmd = KP_ANG_VEL*(ang_vel_error)
                 
-                cmd_l = np.clip(cmd - rot_cmd, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
-                cmd_r = np.clip(cmd + rot_cmd, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
-                cmd_teeterbot(cmd_l, cmd_r)
+                torque_cmd_l = np.clip(cmd - rot_cmd, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
+                torque_cmd_r = np.clip(cmd + rot_cmd, -TEETERBOT_TORQUE_CTRL_MAX, TEETERBOT_TORQUE_CTRL_MAX)
+                cmd_teeterbot(torque_cmd_l, torque_cmd_r)
                 
-                print("lin_vel_body:{: 6.3f} ang_vel_body:{: 6.3f} heading:{: 6.3f}".format(
+                print("lin vel cmd:  {: 6.3f} ang vel cmd: {: 6.3f}".format(
+                    cmd_vel.linear.x, cmd_vel.angular.y))
+                print("lin_vel_body: {: 6.3f} ang_vel_body:{: 6.3f} heading:{: 6.3f}".format(
                     v_body[0], model_states.twist[1].angular.z, fused_angles['yaw']))
-                print("desired_pitch:{: 6.3f} {: 6.3f} {: 6.3f} {: 6.3f}".format(pitch_des, cmd_l, cmd_r, cmd_vel.linear.x, ))
+                print("desired_pitch:{: 6.3f} torque_cmd_l:{: 6.3f} torque_cmd_r:{: 6.3f}".format(
+                    pitch_des, torque_cmd_l, torque_cmd_r, ))
             rate.sleep()
         
     except rospy.ROSInterruptException:
