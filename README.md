@@ -33,6 +33,9 @@ Keyboard control: `rosrun teleop_twist_keyboard teleop_twist_keyboard.py`
 
 Controller: `rosrun driver balancer2.py`
 
+Disturbance rejection:
+`rosservice call teeterbot/nudge 100 .1`
+
 You can type in the keyboard control window to control teeterbot using the keys 
 
     u i o       FORWARD & LEFT | MOVE FORWARD | FORWARD & RIGHT
